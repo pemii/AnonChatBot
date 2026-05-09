@@ -75,6 +75,65 @@ const genderActionHandler = async (ctx) => {
 tgBot.action(/gender_(female|male)/, genderActionHandler);
 baleBot.action(/gender_(female|male)/, genderActionHandler);
 
+// مدیریت پیام‌های متنی کاربران
+const textHandler = async (ctx) => {
+    // اگر پیام متنی نبود، کاری نکن
+    if (!ctx.message || !ctx.message.text) return;
+
+    const userId = ctx.from.id;
+    const text = ctx.message.text;
+
+    try {
+        // دریافت وضعیت فعلی کاربر از دیتابیس
+        const res = await pool.query('SELECT step FROM users WHERE user_id = $1', [userId]);
+        
+        if (res.rows.length === 0) return; // کاربر ثبت‌نام نکرده است
+        
+        const step = res.rows[0].step;
+
+        // اگر کاربر در مرحله ثبت نام کاربری است
+        if (step === 'ask_username') {
+            // اعتبارسنجی: فقط حروف فارسی و فاصله مجاز است
+            const persianRegex = /^[\u0600-\u06FF\s]+$/;
+            
+            if (!persianRegex.test(text)) {
+                return ctx.reply('❌ لطفاً فقط از حروف فارسی استفاده کنید و عدد یا حروف انگلیسی وارد نکنید.');
+            }
+
+            if (text.length < 3 || text.length > 20) {
+                return ctx.reply('❌ نام کاربری باید بین 3 تا 20 حرف باشد.');
+            }
+
+            // ذخیره نام کاربری و رفتن به مرحله بعد (مثلا سن)
+            await pool.query('UPDATE users SET username = $1, step = $2 WHERE user_id = $3', [text, 'ask_age', userId]);
+            
+            ctx.reply(`✅ نام کاربری "${text}" با موفقیت ثبت شد!\n\nحالا لطفاً سن خود را به صورت عدد وارد کنید (مثلاً: 25):`);
+        } 
+        // اگر در مرحله وارد کردن سن بود
+        else if (step === 'ask_age') {
+            const age = parseInt(text);
+
+            if (isNaN(age) || age < 10 || age > 99) {
+                return ctx.reply('❌ لطفاً یک عدد معتبر برای سن وارد کنید (بین 10 تا 99).');
+            }
+
+            // ذخیره سن و اتمام ثبت‌نام اولیه
+            await pool.query('UPDATE users SET age = $1, step = $2 WHERE user_id = $3', [age, 'registered', userId]);
+            
+            ctx.reply('🎉 ثبت‌نام شما با موفقیت تکمیل شد! به زودی امکانات بیشتری به ربات اضافه می‌شود.');
+        }
+
+    } catch (error) {
+        console.error('Database Error in textHandler:', error);
+        ctx.reply('متاسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید.');
+    }
+};
+
+// متصل کردن هندلر به هر دو ربات تلگرام و بله
+tgBot.on('text', textHandler);
+baleBot.on('text', textHandler);
+
+
 // ثبت خطاهای تلگرام
 tgBot.catch((err, ctx) => {
     console.error(`[Telegram Error]`, err);
