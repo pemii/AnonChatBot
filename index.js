@@ -30,7 +30,13 @@ app.get('/', (req, res) => res.send('Bot is running!'));
 app.listen(process.env.PORT || 3000, () => console.log('Web server is up!'));
 
 const tgBot = new Telegraf(process.env.TELEGRAM_TOKEN);
-const baleBot = new Telegraf(process.env.BALE_TOKEN, { telegram: { apiRoot: 'https://tapi.bale.ai' } });
+// ربات بله
+const baleBot = new Telegraf(process.env.BALE_BOT_TOKEN, {
+  telegram: {
+    apiRoot: 'https://tapi.bale.ai'
+  }
+});
+
 
 // تابع شروع و ثبت‌نام اولیه
 const startHandler = async (ctx, platform) => {
@@ -68,6 +74,16 @@ const genderActionHandler = async (ctx) => {
 
 tgBot.action(/gender_(female|male)/, genderActionHandler);
 baleBot.action(/gender_(female|male)/, genderActionHandler);
+
+// ثبت خطاهای تلگرام
+tgBot.catch((err, ctx) => {
+    console.error(`[Telegram Error]`, err);
+});
+
+// ثبت خطاهای بله
+baleBot.catch((err, ctx) => {
+    console.error(`[Bale Error]`, err);
+});
 
 tgBot.launch();
 baleBot.launch();
